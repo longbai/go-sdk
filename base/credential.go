@@ -1,151 +1,221 @@
-package qiniugo
+package base
 
 import (
+	"bytes"
 	"crypto/hmac"
 	"crypto/sha1"
 	"encoding/base64"
 	"fmt"
-	"io"
+	"io/ioutil"
 	"net/http"
+	"net/textproto"
+	"sort"
+	"strings"
+
+	"github.com/longbai/go-sdk/internal/dump"
 )
 
-// Credential 七牛AK/SK的对象，AK/SK可以从 https://portal.qiniu.com/user/key 获取。
-type Credential struct {
+// 七牛签名算法的类型：
+// QBoxToken, QiniuToken, BearToken, QiniuMacToken
+type TokenType int
+
+const (
+	TokenQiniu TokenType = iota
+	TokenQBox
+)
+
+
+//  七牛鉴权类，用于生成Qbox, Qiniu, Upload签名
+// AK/SK可以从 https://portal.qiniu.com/user/key 获取。
+type Credentials struct {
 	AccessKey string
 	SecretKey []byte
 }
 
-// NewCredential 构建一个新的拥有AK/SK的对象
-func NewCredential(accessKey, secretKey string) (credential *Credential) {
-	return &Credential{accessKey, []byte(secretKey)}
+// 构建一个Credentials对象
+func New(accessKey, secretKey string) *Credentials {
+	return &Credentials{accessKey, []byte(secretKey)}
 }
 
 // Sign 对数据进行签名，一般用于私有空间下载用途
-func (credential *Credential) Sign(data []byte) (token string) {
-	h := hmac.New(sha1.New, credential.SecretKey)
+func (ath *Credentials) Sign(data []byte) (token string) {
+	h := hmac.New(sha1.New, ath.SecretKey)
 	h.Write(data)
 
 	sign := base64.URLEncoding.EncodeToString(h.Sum(nil))
-	return fmt.Sprintf("%s:%s", credential.AccessKey, sign)
+	return fmt.Sprintf("%s:%s", ath.AccessKey, sign)
+}
+
+// SignToken 根据t的类型对请求进行签名，并把token加入req中
+func (ath *Credentials) AddToken(t TokenType, req *http.Request) error {
+	switch t {
+	case TokenQiniu:
+		token, sErr := ath.SignRequestV2(req)
+		if sErr != nil {
+			return sErr
+		}
+		req.Header.Add("Authorization", "Qiniu "+token)
+	default:
+		token, err := ath.SignRequest(req)
+		if err != nil {
+			return err
+		}
+		req.Header.Add("Authorization", "QBox "+token)
+	}
+	return nil
 }
 
 // SignWithData 对数据进行签名，一般用于上传凭证的生成用途
-func (credential *Credential) SignWithData(b []byte) (token string) {
+func (ath *Credentials) SignWithData(b []byte) (token string) {
 	encodedData := base64.URLEncoding.EncodeToString(b)
-	h := hmac.New(sha1.New, credential.SecretKey)
-	h.Write([]byte(encodedData))
-	digest := h.Sum(nil)
-	sign := base64.URLEncoding.EncodeToString(digest)
-	return fmt.Sprintf("%s:%s:%s", credential.AccessKey, sign, encodedData)
+	sign := ath.Sign([]byte(encodedData))
+	return fmt.Sprintf("%s:%s", sign, encodedData)
+}
+
+func collectData(req *http.Request) (data []byte, err error) {
+	u := req.URL
+	s := u.Path
+	if u.RawQuery != "" {
+		s += "?"
+		s += u.RawQuery
+	}
+	s += "\n"
+
+	data = []byte(s)
+	if incBody(req) {
+		s2, rErr := dump.BytesFromRequest(req)
+		if rErr != nil {
+			err = rErr
+			return
+		}
+		req.Body = ioutil.NopCloser(bytes.NewReader(s2))
+		data = append(data, s2...)
+	}
+	return
+}
+
+type (
+	xQiniuHeaderItem struct {
+		HeaderName  string
+		HeaderValue string
+	}
+	xQiniuHeaders []xQiniuHeaderItem
+)
+
+func (headers xQiniuHeaders) Len() int {
+	return len(headers)
+}
+
+func (headers xQiniuHeaders) Less(i, j int) bool {
+	if headers[i].HeaderName < headers[j].HeaderName {
+		return true
+	} else if headers[i].HeaderName > headers[j].HeaderName {
+		return false
+	} else {
+		return headers[i].HeaderValue < headers[j].HeaderValue
+	}
+}
+
+func (headers xQiniuHeaders) Swap(i, j int) {
+	headers[i], headers[j] = headers[j], headers[i]
+}
+
+func collectDataV2(req *http.Request) (data []byte, err error) {
+	u := req.URL
+
+	//write method path?query
+	s := fmt.Sprintf("%s %s", req.Method, u.Path)
+	if u.RawQuery != "" {
+		s += "?"
+		s += u.RawQuery
+	}
+
+	//write host and post
+	s += "\nHost: " + req.Host + "\n"
+
+	//write content type
+	contentType := req.Header.Get("Content-Type")
+	if contentType == "" {
+		contentType = "application/x-www-form-urlencoded"
+		req.Header.Set("Content-Type", contentType)
+	}
+	s += fmt.Sprintf("Content-Type: %s\n", contentType)
+
+	xQiniuHeaders := make(xQiniuHeaders, 0, len(req.Header))
+	for headerName, headerValues := range req.Header {
+		if len(headerName) > len("X-Qiniu-") && strings.HasPrefix(headerName, "X-Qiniu-") {
+			for _, headerValue := range headerValues {
+				xQiniuHeaders = append(xQiniuHeaders, xQiniuHeaderItem{
+					HeaderName:  textproto.CanonicalMIMEHeaderKey(headerName),
+					HeaderValue: headerValue,
+				})
+			}
+		}
+	}
+	if len(xQiniuHeaders) > 0 {
+		sort.Sort(xQiniuHeaders)
+		for _, xQiniuHeader := range xQiniuHeaders {
+			s += fmt.Sprintf("%s: %s\n", xQiniuHeader.HeaderName, xQiniuHeader.HeaderValue)
+		}
+	}
+	s += "\n"
+
+	data = []byte(s)
+	//write body
+	if incBodyV2(req) {
+		s2, rErr := dump.BytesFromRequest(req)
+		if rErr != nil {
+			err = rErr
+			return
+		}
+		req.Body = ioutil.NopCloser(bytes.NewReader(s2))
+		data = append(data, s2...)
+	}
+	return
 }
 
 // SignRequest 对数据进行签名，一般用于管理凭证的生成
-func (credential *Credential) SignRequest(req *http.Request) (token string, err error) {
-	h := hmac.New(sha1.New, credential.SecretKey)
-
-	u := req.URL
-	data := u.Path
-	if u.RawQuery != "" {
-		data += "?" + u.RawQuery
+func (ath *Credentials) SignRequest(req *http.Request) (token string, err error) {
+	data, err := collectData(req)
+	if err != nil {
+		return
 	}
-	io.WriteString(h, data+"\n")
-
-	if incBody(req) {
-		s2, err2 := seekable.New(req)
-		if err2 != nil {
-			return "", err2
-		}
-		h.Write(s2.Bytes())
-	}
-
-	sign := base64.URLEncoding.EncodeToString(h.Sum(nil))
-	token = fmt.Sprintf("%s:%s", credential.AccessKey, sign)
+	token = ath.Sign(data)
 	return
 }
 
 // SignRequestV2 对数据进行签名，一般用于高级管理凭证的生成
-func (credential *Credential) SignRequestV2(req *http.Request) (token string, err error) {
-	h := hmac.New(sha1.New, credential.SecretKey)
+func (ath *Credentials) SignRequestV2(req *http.Request) (token string, err error) {
 
-	u := req.URL
-
-	//write method path?query
-	io.WriteString(h, fmt.Sprintf("%s %s", req.Method, u.Path))
-	if u.RawQuery != "" {
-		io.WriteString(h, "?")
-		io.WriteString(h, u.RawQuery)
+	data, err := collectDataV2(req)
+	if err != nil {
+		return
 	}
-
-	//write host and posrt
-	io.WriteString(h, "\nHost: ")
-	io.WriteString(h, req.Host)
-	if req.URL.Port() != "" {
-		io.WriteString(h, ":")
-		io.WriteString(h, req.URL.Port())
-	}
-
-	//write content type
-	contentType := req.Header.Get("Content-Type")
-	if contentType != "" {
-		io.WriteString(h, "\n")
-		io.WriteString(h, fmt.Sprintf("Content-Type: %s", contentType))
-	}
-
-	io.WriteString(h, "\n\n")
-
-	//write body
-	if incBodyV2(req) {
-		body := 
-		s2, err2 := seekable.New(req)
-		if err2 != nil {
-			return "", err2
-		}
-		h.Write(s2.Bytes())
-	}
-
-	sign := base64.URLEncoding.EncodeToString(h.Sum(nil))
-	token = fmt.Sprintf("%s:%s", credential.AccessKey, sign)
+	token = ath.Sign(data)
 	return
 }
 
 // 管理凭证生成时，是否同时对request body进行签名
 func incBody(req *http.Request) bool {
-	return req.Body != nil &&
-		req.Header.Get("Content-Type") == "application/x-www-form-urlencoded"
+	return req.Body != nil && req.Header.Get("Content-Type") == CONTENT_TYPE_FORM
 }
 
 func incBodyV2(req *http.Request) bool {
 	contentType := req.Header.Get("Content-Type")
-	return req.Body != nil && (contentType == "application/x-www-form-urlencoded" ||
-		contentType == "application/json")
+	return req.Body != nil && (contentType == CONTENT_TYPE_FORM || contentType == CONTENT_TYPE_JSON)
 }
 
 // VerifyCallback 验证上传回调请求是否来自七牛
-func (credential *Credential) VerifyCallback(req *http.Request) (bool, error) {
+func (ath *Credentials) VerifyCallback(req *http.Request) (bool, error) {
 	auth := req.Header.Get("Authorization")
 	if auth == "" {
 		return false, nil
 	}
 
-	token, err := credential.SignRequest(req)
+	token, err := ath.SignRequest(req)
 	if err != nil {
 		return false, err
 	}
 
 	return auth == "QBox "+token, nil
-}
-
-// Sign 一般用于下载凭证的签名
-func Sign(credential *Credential, data []byte) string {
-	return credential.Sign(data)
-}
-
-// SignWithData 一般用于上传凭证的签名
-func SignWithData(credential *Credential, data []byte) string {
-	return credential.SignWithData(data)
-}
-
-// VerifyCallback 验证上传回调请求是否来自七牛
-func VerifyCallback(credential *Credential, req *http.Request) (bool, error) {
-	return credential.VerifyCallback(req)
 }
