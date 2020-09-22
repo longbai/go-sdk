@@ -33,7 +33,7 @@ type Credentials struct {
 }
 
 // 构建一个Credentials对象
-func New(accessKey, secretKey string) *Credentials {
+func NewCredentials(accessKey, secretKey string) *Credentials {
 	return &Credentials{accessKey, []byte(secretKey)}
 }
 

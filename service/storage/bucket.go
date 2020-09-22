@@ -19,7 +19,7 @@ import (
 	"strings"
 
 	client "github.com/longbai/go-sdk/internal"
-	auth "github.com/longbai/go-sdk/base"
+	"github.com/longbai/go-sdk/base"
 )
 
 // 资源管理相关的默认域名
@@ -85,12 +85,12 @@ type BatchOpRet struct {
 // BucketManager 提供了对资源进行管理的操作
 type BucketManager struct {
 	Client *client.Client
-	Mac    *auth.Credentials
+	Mac    *base.Credentials
 	Cfg    *Config
 }
 
 // NewBucketManager 用来构建一个新的资源管理对象
-func NewBucketManager(mac *auth.Credentials, cfg *Config) *BucketManager {
+func NewBucketManager(mac *base.Credentials, cfg *Config) *BucketManager {
 	if cfg == nil {
 		cfg = &Config{}
 	}
@@ -106,7 +106,7 @@ func NewBucketManager(mac *auth.Credentials, cfg *Config) *BucketManager {
 }
 
 // NewBucketManagerEx 用来构建一个新的资源管理对象
-func NewBucketManagerEx(mac *auth.Credentials, cfg *Config, clt *client.Client) *BucketManager {
+func NewBucketManagerEx(mac *base.Credentials, cfg *Config, clt *client.Client) *BucketManager {
 	if cfg == nil {
 		cfg = &Config{}
 	}
@@ -153,7 +153,7 @@ func (m *BucketManager) UpdateObjectStatus(bucketName string, key string, enable
 		return reqErr
 	}
 	reqURL := fmt.Sprintf("%s%s", reqHost, path)
-	return m.Client.CredentialedCall(context.Background(), m.Mac, auth.TokenQiniu, nil, "POST", reqURL, nil)
+	return m.Client.CredentialedCall(context.Background(), m.Mac, base.TokenQiniu, nil, "POST", reqURL, nil)
 }
 
 // CreateBucket 创建一个七牛存储空间
@@ -162,7 +162,7 @@ func (m *BucketManager) CreateBucket(bucketName string, regionID RegionID) error
 
 	reqHost = m.Cfg.RsReqHost()
 	reqURL := fmt.Sprintf("%s/mkbucketv3/%s/region/%s", reqHost, bucketName, string(regionID))
-	return m.Client.CredentialedCall(context.Background(), m.Mac, auth.TokenQiniu, nil, "POST", reqURL, nil)
+	return m.Client.CredentialedCall(context.Background(), m.Mac, base.TokenQiniu, nil, "POST", reqURL, nil)
 }
 
 // Buckets 用来获取空间列表，如果指定了 shared 参数为 true，那么一同列表被授权访问的空间
@@ -171,7 +171,7 @@ func (m *BucketManager) Buckets(shared bool) (buckets []string, err error) {
 
 	reqHost = m.Cfg.RsReqHost()
 	reqURL := fmt.Sprintf("%s/buckets?shared=%v", reqHost, shared)
-	err = m.Client.CredentialedCall(context.Background(), m.Mac, auth.TokenQiniu, &buckets, "POST", reqURL, nil)
+	err = m.Client.CredentialedCall(context.Background(), m.Mac, base.TokenQiniu, &buckets, "POST", reqURL, nil)
 	return
 }
 
@@ -181,7 +181,7 @@ func (m *BucketManager) DropBucket(bucketName string) (err error) {
 
 	reqHost = m.Cfg.RsReqHost()
 	reqURL := fmt.Sprintf("%s/drop/%s", reqHost, bucketName)
-	err = m.Client.CredentialedCall(context.Background(), m.Mac, auth.TokenQiniu, nil, "POST", reqURL, nil)
+	err = m.Client.CredentialedCall(context.Background(), m.Mac, base.TokenQiniu, nil, "POST", reqURL, nil)
 	return
 }
 
@@ -194,7 +194,7 @@ func (m *BucketManager) Stat(bucket, key string) (info FileInfo, err error) {
 	}
 
 	reqURL := fmt.Sprintf("%s%s", reqHost, URIStat(bucket, key))
-	err = m.Client.CredentialedCall(context.Background(), m.Mac, auth.TokenQiniu, &info, "POST", reqURL, nil)
+	err = m.Client.CredentialedCall(context.Background(), m.Mac, base.TokenQiniu, &info, "POST", reqURL, nil)
 	return
 }
 
@@ -206,7 +206,7 @@ func (m *BucketManager) Delete(bucket, key string) (err error) {
 		return
 	}
 	reqURL := fmt.Sprintf("%s%s", reqHost, URIDelete(bucket, key))
-	err = m.Client.CredentialedCall(context.Background(), m.Mac, auth.TokenQiniu, nil, "POST", reqURL, nil)
+	err = m.Client.CredentialedCall(context.Background(), m.Mac, base.TokenQiniu, nil, "POST", reqURL, nil)
 	return
 }
 
@@ -219,7 +219,7 @@ func (m *BucketManager) Copy(srcBucket, srcKey, destBucket, destKey string, forc
 	}
 
 	reqURL := fmt.Sprintf("%s%s", reqHost, URICopy(srcBucket, srcKey, destBucket, destKey, force))
-	err = m.Client.CredentialedCall(context.Background(), m.Mac, auth.TokenQiniu, nil, "POST", reqURL, nil)
+	err = m.Client.CredentialedCall(context.Background(), m.Mac, base.TokenQiniu, nil, "POST", reqURL, nil)
 	return
 }
 
@@ -232,7 +232,7 @@ func (m *BucketManager) Move(srcBucket, srcKey, destBucket, destKey string, forc
 	}
 
 	reqURL := fmt.Sprintf("%s%s", reqHost, URIMove(srcBucket, srcKey, destBucket, destKey, force))
-	err = m.Client.CredentialedCall(context.Background(), m.Mac, auth.TokenQiniu, nil, "POST", reqURL, nil)
+	err = m.Client.CredentialedCall(context.Background(), m.Mac, base.TokenQiniu, nil, "POST", reqURL, nil)
 	return
 }
 
@@ -244,7 +244,7 @@ func (m *BucketManager) ChangeMime(bucket, key, newMime string) (err error) {
 		return
 	}
 	reqURL := fmt.Sprintf("%s%s", reqHost, URIChangeMime(bucket, key, newMime))
-	err = m.Client.CredentialedCall(context.Background(), m.Mac, auth.TokenQiniu, nil, "POST", reqURL, nil)
+	err = m.Client.CredentialedCall(context.Background(), m.Mac, base.TokenQiniu, nil, "POST", reqURL, nil)
 	return
 }
 
@@ -256,7 +256,7 @@ func (m *BucketManager) ChangeType(bucket, key string, fileType int) (err error)
 		return
 	}
 	reqURL := fmt.Sprintf("%s%s", reqHost, URIChangeType(bucket, key, fileType))
-	err = m.Client.CredentialedCall(context.Background(), m.Mac, auth.TokenQiniu, nil, "POST", reqURL, nil)
+	err = m.Client.CredentialedCall(context.Background(), m.Mac, base.TokenQiniu, nil, "POST", reqURL, nil)
 	return
 }
 
@@ -268,7 +268,7 @@ func (m *BucketManager) RestoreAr(bucket, key string, freezeAfterDays int) (err 
 		return
 	}
 	reqURL := fmt.Sprintf("%s%s", reqHost, URIRestoreAr(bucket, key, freezeAfterDays))
-	err = m.Client.CredentialedCall(context.Background(), m.Mac, auth.TokenQiniu, nil, "POST", reqURL, nil)
+	err = m.Client.CredentialedCall(context.Background(), m.Mac, base.TokenQiniu, nil, "POST", reqURL, nil)
 	return
 }
 
@@ -281,7 +281,7 @@ func (m *BucketManager) DeleteAfterDays(bucket, key string, days int) (err error
 	}
 
 	reqURL := fmt.Sprintf("%s%s", reqHost, URIDeleteAfterDays(bucket, key, days))
-	err = m.Client.CredentialedCall(context.Background(), m.Mac, auth.TokenQiniu, nil, "POST", reqURL, nil)
+	err = m.Client.CredentialedCall(context.Background(), m.Mac, base.TokenQiniu, nil, "POST", reqURL, nil)
 	return
 }
 
@@ -299,7 +299,7 @@ func (m *BucketManager) Batch(operations []string) (batchOpRet []BatchOpRet, err
 	params := map[string][]string{
 		"op": operations,
 	}
-	err = m.Client.CredentialedCallWithForm(context.Background(), m.Mac, auth.TokenQiniu, &batchOpRet, "POST", reqURL, nil, params)
+	err = m.Client.CredentialedCallWithForm(context.Background(), m.Mac, base.TokenQiniu, &batchOpRet, "POST", reqURL, nil, params)
 	return
 }
 
@@ -311,7 +311,7 @@ func (m *BucketManager) Fetch(resURL, bucket, key string) (fetchRet FetchRet, er
 		return
 	}
 	reqURL := fmt.Sprintf("%s%s", reqHost, uriFetch(resURL, bucket, key))
-	err = m.Client.CredentialedCall(context.Background(), m.Mac, auth.TokenQBox, &fetchRet, "POST", reqURL, nil)
+	err = m.Client.CredentialedCall(context.Background(), m.Mac, base.TokenQBox, &fetchRet, "POST", reqURL, nil)
 	return
 }
 
@@ -395,7 +395,7 @@ func (m *BucketManager) FetchWithoutKey(resURL, bucket string) (fetchRet FetchRe
 		return
 	}
 	reqURL := fmt.Sprintf("%s%s", reqHost, uriFetchWithoutKey(resURL, bucket))
-	err = m.Client.CredentialedCall(context.Background(), m.Mac, auth.TokenQBox, &fetchRet, "POST", reqURL, nil)
+	err = m.Client.CredentialedCall(context.Background(), m.Mac, base.TokenQBox, &fetchRet, "POST", reqURL, nil)
 	return
 }
 
@@ -420,7 +420,7 @@ func (m *BucketManager) ListBucketDomains(bucket string) (info []DomainInfo, err
 		return
 	}
 	reqURL := fmt.Sprintf("%s/v7/domain/list?tbl=%s", reqHost, bucket)
-	err = m.Client.CredentialedCall(context.Background(), m.Mac, auth.TokenQiniu, &info, "GET", reqURL, nil)
+	err = m.Client.CredentialedCall(context.Background(), m.Mac, base.TokenQiniu, &info, "GET", reqURL, nil)
 	return
 }
 
@@ -432,14 +432,14 @@ func (m *BucketManager) Prefetch(bucket, key string) (err error) {
 		return
 	}
 	reqURL := fmt.Sprintf("%s%s", reqHost, uriPrefetch(bucket, key))
-	err = m.Client.CredentialedCall(context.Background(), m.Mac, auth.TokenQiniu, nil, "POST", reqURL, nil)
+	err = m.Client.CredentialedCall(context.Background(), m.Mac, base.TokenQiniu, nil, "POST", reqURL, nil)
 	return
 }
 
 // SetImage 用来设置空间镜像源
 func (m *BucketManager) SetImage(siteURL, bucket string) (err error) {
 	reqURL := fmt.Sprintf("http://%s%s", DefaultPubHost, uriSetImage(siteURL, bucket))
-	err = m.Client.CredentialedCall(context.Background(), m.Mac, auth.TokenQiniu, nil, "POST", reqURL, nil)
+	err = m.Client.CredentialedCall(context.Background(), m.Mac, base.TokenQiniu, nil, "POST", reqURL, nil)
 	return
 }
 
@@ -447,14 +447,14 @@ func (m *BucketManager) SetImage(siteURL, bucket string) (err error) {
 func (m *BucketManager) SetImageWithHost(siteURL, bucket, host string) (err error) {
 	reqURL := fmt.Sprintf("http://%s%s", DefaultPubHost,
 		uriSetImageWithHost(siteURL, bucket, host))
-	err = m.Client.CredentialedCall(context.Background(), m.Mac, auth.TokenQiniu, nil, "POST", reqURL, nil)
+	err = m.Client.CredentialedCall(context.Background(), m.Mac, base.TokenQiniu, nil, "POST", reqURL, nil)
 	return
 }
 
 // UnsetImage 用来取消空间镜像源设置
 func (m *BucketManager) UnsetImage(bucket string) (err error) {
 	reqURL := fmt.Sprintf("http://%s%s", DefaultPubHost, uriUnsetImage(bucket))
-	err = m.Client.CredentialedCall(context.Background(), m.Mac, auth.TokenQiniu, nil, "POST", reqURL, nil)
+	err = m.Client.CredentialedCall(context.Background(), m.Mac, base.TokenQiniu, nil, "POST", reqURL, nil)
 	return err
 }
 
@@ -475,7 +475,7 @@ func (m *BucketManager) ListFiles(bucket, prefix, delimiter, marker string,
 
 	ret := listFilesRet{}
 	reqURL := fmt.Sprintf("%s%s", reqHost, uriListFiles(bucket, prefix, delimiter, marker, limit))
-	err = m.Client.CredentialedCall(context.Background(), m.Mac, auth.TokenQiniu, &ret, "POST", reqURL, nil)
+	err = m.Client.CredentialedCall(context.Background(), m.Mac, base.TokenQiniu, &ret, "POST", reqURL, nil)
 	if err != nil {
 		return
 	}
@@ -493,7 +493,7 @@ func (m *BucketManager) ListFiles(bucket, prefix, delimiter, marker string,
 // ListBucket 用来获取空间文件列表，可以根据需要指定文件的前缀 prefix，文件的目录 delimiter，流式返回每条数据。
 func (m *BucketManager) ListBucket(bucket, prefix, delimiter, marker string) (retCh chan listFilesRet2, err error) {
 
-	ctx := auth.WithCredentialsType(context.Background(), m.Mac, auth.TokenQiniu)
+	ctx := base.WithCredentialsType(context.Background(), m.Mac, base.TokenQiniu)
 	reqHost, reqErr := m.RsfReqHost(bucket)
 	if reqErr != nil {
 		err = reqErr
@@ -510,7 +510,7 @@ func (m *BucketManager) ListBucket(bucket, prefix, delimiter, marker string) (re
 // 接受的context可以用来取消列举操作
 func (m *BucketManager) ListBucketContext(ctx context.Context, bucket, prefix, delimiter, marker string) (retCh chan listFilesRet2, err error) {
 
-	ctx = auth.WithCredentialsType(context.Background(), m.Mac, auth.TokenQiniu)
+	ctx = base.WithCredentialsType(context.Background(), m.Mac, base.TokenQiniu)
 	reqHost, reqErr := m.RsfReqHost(bucket)
 	if reqErr != nil {
 		err = reqErr
@@ -550,7 +550,7 @@ func (m *BucketManager) AsyncFetch(param AsyncFetchParam) (ret AsyncFetchRet, er
 
 	reqUrl += "/sisyphus/fetch"
 
-	err = m.Client.CredentialedCallWithJson(context.Background(), m.Mac, auth.TokenQiniu, &ret, "POST", reqUrl, nil, param)
+	err = m.Client.CredentialedCallWithJson(context.Background(), m.Mac, base.TokenQiniu, &ret, "POST", reqUrl, nil, param)
 	return
 }
 
@@ -734,7 +734,7 @@ func MakePublicURL(domain, key string) (finalUrl string) {
 }
 
 // MakePrivateURL 用来生成私有空间资源下载链接
-func MakePrivateURL(mac *auth.Credentials, domain, key string, deadline int64) (privateURL string) {
+func MakePrivateURL(mac *base.Credentials, domain, key string, deadline int64) (privateURL string) {
 	publicURL := MakePublicURL(domain, key)
 	urlToSign := publicURL
 	if strings.Contains(publicURL, "?") {

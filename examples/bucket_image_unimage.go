@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	auth "github.com/longbai/go-sdk/base"
+	"github.com/longbai/go-sdk/base"
 	"github.com/longbai/go-sdk/service/storage"
 )
 
@@ -16,7 +16,7 @@ var (
 
 func main() {
 	cfg := storage.Config{}
-	mac := auth.New(accessKey, secretKey)
+	mac := base.NewCredentials(accessKey, secretKey)
 	bucketManger := storage.NewBucketManager(mac, &cfg)
 	siteURL := "http://devtools.qiniu.com"
 
