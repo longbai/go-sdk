@@ -1,5 +1,5 @@
 // Package log只是SDK本身自己使用，用来调试代码使用，比如输出HTTP请求和响应信息
-package internal
+package log
 
 import (
 	"io"
@@ -9,11 +9,11 @@ import (
 
 type Logger struct {
 	*log.Logger
-	level LogLevel
+	level Level
 }
 
 // New 返回一个Logger 指针
-func New(out io.Writer, prefix string, flag int, level LogLevel) *Logger {
+func New(out io.Writer, prefix string, flag int, level Level) *Logger {
 	return &Logger{
 		Logger: log.New(out, prefix, flag),
 		level:  level,
@@ -21,22 +21,20 @@ func New(out io.Writer, prefix string, flag int, level LogLevel) *Logger {
 }
 
 var (
-	std  = New(os.Stdout, DebugPrefix, log.LstdFlags, LogDebug)
-	info = New(os.Stdout, InfoPrefix, log.LstdFlags, LogInfo)
-	warn = New(os.Stdout, WarnPrefix, log.LstdFlags, LogWarn)
+	std   = New(os.Stdout, DebugPrefix, log.LstdFlags, DebugLevel)
+	info  = New(os.Stdout, InfoPrefix, log.LstdFlags, InfoLevel)
+	warn  = New(os.Stdout, WarnPrefix, log.LstdFlags, WarnLevel)
+	error = New(os.Stderr, WarnPrefix, log.LstdFlags, ErrorLevel)
 )
 
-type LogLevel int
+type Level int
 
 const (
-	// LogDebug 调试模式
-	LogDebug LogLevel = iota
-
-	// Info
-	LogInfo
-
-	// Warn
-	LogWarn
+	TraceLevel Level = iota
+	DebugLevel
+	InfoLevel
+	WarnLevel
+	ErrorLevel
 )
 
 const (
@@ -46,21 +44,21 @@ const (
 )
 
 func (l *Logger) Info(v ...interface{}) {
-	l.output(LogInfo, v...)
+	l.output(InfoLevel, v...)
 }
 
-func (l *Logger) output(level LogLevel, v ...interface{}) {
+func (l *Logger) output(level Level, v ...interface{}) {
 	if l.level <= level {
 		l.Logger.Println(v...)
 	}
 }
 
 func (l *Logger) Debug(v ...interface{}) {
-	l.output(LogDebug, v...)
+	l.output(DebugLevel, v...)
 }
 
 func (l *Logger) Warn(v ...interface{}) {
-	l.output(LogWarn, v...)
+	l.output(WarnLevel, v...)
 }
 
 func Debug(v ...interface{}) {

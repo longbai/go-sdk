@@ -4,10 +4,9 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"github.com/longbai/go-sdk/base/auth"
 	"strings"
 	"time"
-
-	auth "github.com/longbai/go-sdk/base"
 )
 
 // PutPolicy 表示文件上传的上传策略，参考 https://developer.qiniu.com/kodo/manual/1206/put-policy
